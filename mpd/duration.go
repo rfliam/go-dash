@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/peterhellberg/duration"
 )
 
 type Duration time.Duration
@@ -31,7 +33,7 @@ func (d Duration) MarshalXMLAttr(name xml.Name) (xml.Attr, error) {
 }
 
 func (d *Duration) UnmarshalXMLAttr(attr xml.Attr) error {
-	dur, err := parseDuration(attr.Value)
+	dur, err := duration.Parse(attr.Value)
 	if err != nil {
 		return err
 	}

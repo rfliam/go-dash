@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"os"
 )
@@ -34,7 +35,7 @@ func Read(r io.Reader) (*MPD, error) {
 	d := xml.NewDecoder(r)
 	err := d.Decode(&mpd)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("mpd decode error %s", err)
 	}
 	return &mpd, nil
 }

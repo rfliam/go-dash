@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -59,13 +60,38 @@ var (
 	ErrContentProtectionNil                 = errors.New("Content Protection nil")
 )
 
+type Time time.Time
+
+func (t *Time) MarshalXMLAttr(name xml.Name) (xml.Attr, error) {
+	t2 := time.Time{}.Format(time.RFC3339)
+	if t != nil {
+		t2 = time.Time(*t).Format(time.RFC3339)
+	}
+	return xml.Attr{Name: name, Value: t2}, nil
+}
+
+func (t *Time) UnmarshalXMLAttr(attr xml.Attr) error {
+	parsed, err := time.Parse(time.RFC3339, attr.Value)
+	if err != nil {
+		return fmt.Errorf("error unmarshaling field %s as RFC3339 time %s", attr.Name, err)
+	}
+	*t = Time(parsed)
+	return nil
+}
+
 type MPD struct {
-	XMLNs                     *string `xml:"xmlns,attr"`
-	Profiles                  *string `xml:"profiles,attr"`
-	Type                      *string `xml:"type,attr"`
-	MediaPresentationDuration *string `xml:"mediaPresentationDuration,attr"`
-	MinBufferTime             *string `xml:"minBufferTime,attr"`
-	BaseURL                   string  `xml:"BaseURL,omitempty"`
+	XMLNs                     *string   `xml:"xmlns,attr"`
+	XMLNSSCTE35               string    `xml:"xmlns:scte35,attr"`
+	Profiles                  *string   `xml:"profiles,attr"`
+	Type                      *string   `xml:"type,attr"`
+	MediaPresentationDuration *string   `xml:"mediaPresentationDuration,attr"`
+	MinBufferTime             *string   `xml:"minBufferTime,attr"`
+	BaseURL                   string    `xml:"BaseURL,omitempty"`
+	AvailabilityStartTime     *Time     `xml:"availabilityStartTime,attr"`
+	PublishTime               *Time     `xml:"publishTime,attr"`
+	TimeShiftBufferDepth      *Duration `xml:"timeShiftBufferDepth,attr"`
+	MaxSegmentDuration        *Duration `xml:"maxSegmentDuration,attr"`
+	MinimumUpdatePeriod       *Duration `xml:"minimumUpdatePeriod,attr"`
 	period                    *Period
 	Periods                   []*Period `xml:"Period,omitempty"`
 }
@@ -73,12 +99,13 @@ type MPD struct {
 type Period struct {
 	ID              string           `xml:"id,attr,omitempty"`
 	Duration        Duration         `xml:"duration,attr,omitempty"`
-	Start           Duration         `xml:"start,attr,omitempty"`
+	Start           Duration         `xml:"start,attr"`
 	BaseURL         string           `xml:"BaseURL,omitempty"`
 	SegmentBase     *SegmentBase     `xml:"SegmentBase,omitempty"`
 	SegmentList     *SegmentList     `xml:"SegmentList,omitempty"`
 	SegmentTemplate *SegmentTemplate `xml:"SegmentTemplate,omitempty"`
 	AdaptationSets  []*AdaptationSet `xml:"AdaptationSet,omitempty"`
+	EventStreams    []*EventStream   `xml:"EventStream,omitempty"`
 }
 
 type DescriptorType struct {
@@ -110,6 +137,23 @@ type CommonAttributesAndElements struct {
 	InbandEventStream         *DescriptorType       `xml:"inbandEventStream,attr"`
 }
 
+type SCTE35Signal struct {
+	XMLName xml.Name `xml:"scte35:Signal"`
+	Binary  string   `xml:"scte35:Binary"`
+}
+
+type Event struct {
+	Duration int64  `xml:"duration,attr"`
+	ID       string `xml:"id,attr"`
+	Signal   SCTE35Signal
+}
+
+type EventStream struct {
+	Timescale   int64    `xml:"timescale,attr"`
+	SchemeIDURI string   `xml:"schemeIdUri,attr"`
+	Events      []*Event `xml:"Event"`
+}
+
 type AdaptationSet struct {
 	CommonAttributesAndElements
 	XMLName           xml.Name              `xml:"AdaptationSet"`
@@ -122,6 +166,7 @@ type AdaptationSet struct {
 	MaxBandwidth      *string               `xml:"maxBandwidth,attr"`
 	MinWidth          *string               `xml:"minWidth,attr"`
 	MaxWidth          *string               `xml:"maxWidth,attr"`
+	ContentType       *string               `xml:"contentType,attr"`
 	ContentProtection []ContentProtectioner `xml:"ContentProtection,omitempty"` // Common attribute, can be deprecated here
 	Roles             []*Role               `xml:"Role,omitempty"`
 	SegmentBase       *SegmentBase          `xml:"SegmentBase,omitempty"`
